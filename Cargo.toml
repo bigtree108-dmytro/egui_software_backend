@@ -17,7 +17,10 @@ ahash = { version = "0.8", default-features = false, features = ["no-rng"] }
 
 rayon = { version = "1.11.0", optional = true }
 log = { version = "0.4", optional = true }
-winit = { version = "0.30", optional = true }
+# Default features off so that the Wayland decoration choice below is ours to make rather than
+# winit's. `rwh_06` is what softbuffer needs to reach the window; the rest are turned back on by
+# this crate's own features.
+winit = { version = "0.30", optional = true, default-features = false, features = ["rwh_06"] }
 softbuffer = { version = "0.4", optional = true }
 egui-winit = { version = "0.34", default-features = false, optional = true }
 bytemuck = { version = "1.25", optional = true }
@@ -55,7 +58,7 @@ opt-level = 3
 members = ["constify"]
 
 [features]
-default = ["std", "winit"]
+default = ["std", "winit", "wayland-csd-title"]
 
 std = ["ahash/std"]
 
@@ -67,7 +70,27 @@ rayon = ["dep:rayon"]
 
 raster_stats = ["std"]
 test_render = ["dep:image", "dep:egui_kittest"]
-winit = ["dep:winit", "softbuffer", "egui-winit", "bytemuck"]
+winit = [
+    "dep:winit",
+    "softbuffer",
+    "egui-winit",
+    "bytemuck",
+    "winit?/x11",
+    "winit?/wayland",
+    "winit?/wayland-dlopen",
+]
+# GNOME's compositor draws no decorations for Wayland clients, so winit has to draw them itself or
+# the window has no title bar, no buttons, and nothing to drag it by. Which of the two it uses is a
+# real trade and is left to whoever is building:
+#
+#   wayland-csd-title    decorations with the window title written in them. The default, because it
+#                        is what the window had before this was a choice. Costs `ab_glyph` and
+#                        `ttf-parser` — the latter unmaintained, RUSTSEC-2026-0192.
+#   wayland-csd-plain    the same decorations with no title text, and neither of those crates.
+#
+# Turning both off leaves a Wayland window undecorated, which is almost never what anybody wants.
+wayland-csd-title = ["winit?/wayland-csd-adwaita"]
+wayland-csd-plain = ["winit?/wayland-csd-adwaita-notitle"]
 
 # Testing:
 # cargo test --features test_render
