@@ -79,6 +79,9 @@ winit = [
     "winit?/wayland",
     "winit?/wayland-dlopen",
 ]
+## Expose the window to screen readers through [AccessKit](https://accesskit.dev). egui builds the
+## accessibility tree either way; this is what carries it to the platform.
+accesskit = ["winit", "egui-winit?/accesskit"]
 # GNOME's compositor draws no decorations for Wayland clients, so winit has to draw them itself or
 # the window has no title bar, no buttons, and nothing to drag it by. Which of the two it uses is a
 # real trade and is left to whoever is building:
