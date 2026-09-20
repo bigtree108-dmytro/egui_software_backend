@@ -204,6 +204,30 @@ impl<EguiApp: App, EguiAppFactory: FnMut(Context) -> EguiApp>
             .replace(false)
             .unwrap_or(true);
 
+        // A window larger than the display crashes some Linux compositors and simply never
+        // appears on Windows. egui carries `clamp_size_to_monitor_size` for exactly this and
+        // `egui_winit` deliberately ignores it, leaving it to the integration; nothing here was
+        // doing it, so a size an application restored from a large monitor opened off the edge of
+        // a small one. Defaulting it on matches eframe, which is where the setting comes from.
+        if self
+            .config
+            .viewport_builder
+            .clamp_size_to_monitor_size
+            .unwrap_or(true)
+        {
+            let largest = largest_monitor_point_size(self.egui_context.zoom_factor(), elwt);
+
+            if let Some(inner_size) = self.config.viewport_builder.inner_size {
+                self.config.viewport_builder.inner_size = Some(inner_size.min(largest));
+            }
+            // The minimum is clamped too, and after the size: a minimum larger than the display
+            // makes a window the person cannot shrink to fit their own screen, and a minimum left
+            // above the clamped size would immediately undo the clamp.
+            if let Some(min_inner_size) = self.config.viewport_builder.min_inner_size {
+                self.config.viewport_builder.min_inner_size = Some(min_inner_size.min(largest));
+            }
+        }
+
         let window =
             egui_winit::create_window(&self.egui_context, elwt, &self.config.viewport_builder);
 
@@ -230,6 +254,29 @@ impl<EguiApp: App, EguiAppFactory: FnMut(Context) -> EguiApp>
             window,
             event_loop_proxy: self.event_loop_proxy,
         })
+    }
+}
+
+/// The size of the largest display, in egui points, or a figure past any real display when winit
+/// can name none — which is what eframe falls back to rather than clamping everything to zero.
+#[cfg(feature = "winit")]
+fn largest_monitor_point_size(zoom_factor: f32, elwt: &ActiveEventLoop) -> Vec2 {
+    /// Larger than any display, so a machine that reports no monitors clamps nothing.
+    const NO_MONITORS: f32 = 16000.0;
+
+    let mut largest = Vec2::ZERO;
+
+    for monitor in elwt.available_monitors() {
+        let size = monitor
+            .size()
+            .to_logical::<f32>(f64::from(zoom_factor) * monitor.scale_factor());
+        largest = largest.max(Vec2::new(size.width, size.height));
+    }
+
+    if largest == Vec2::ZERO {
+        Vec2::splat(NO_MONITORS)
+    } else {
+        largest
     }
 }
 
