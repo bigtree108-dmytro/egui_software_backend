@@ -226,6 +226,16 @@ impl<EguiApp: App, EguiAppFactory: FnMut(Context) -> EguiApp>
             if let Some(min_inner_size) = self.config.viewport_builder.min_inner_size {
                 self.config.viewport_builder.min_inner_size = Some(min_inner_size.min(largest));
             }
+
+            // A position is dropped rather than moved when it names a point no display covers,
+            // which is what a size restored from a monitor that has since been unplugged looks
+            // like. Without a position winit puts the window where the system would, and somewhere
+            // predictable beats somewhere off the edge of the desktop.
+            if let Some(position) = self.config.viewport_builder.position {
+                if !any_monitor_covers(position, self.egui_context.zoom_factor(), elwt) {
+                    self.config.viewport_builder.position = None;
+                }
+            }
         }
 
         let window =
@@ -255,6 +265,32 @@ impl<EguiApp: App, EguiAppFactory: FnMut(Context) -> EguiApp>
             event_loop_proxy: self.event_loop_proxy,
         })
     }
+}
+
+/// Whether any display covers that point, in egui points. A machine that can name no display at
+/// all answers yes, because there is then nothing to place the window against and dropping a
+/// position on that evidence would be a guess.
+#[cfg(feature = "winit")]
+fn any_monitor_covers(position: Pos2, zoom_factor: f32, elwt: &ActiveEventLoop) -> bool {
+    let mut saw_a_monitor = false;
+
+    for monitor in elwt.available_monitors() {
+        saw_a_monitor = true;
+
+        let points = f64::from(zoom_factor) * monitor.scale_factor();
+        let origin = monitor.position().to_logical::<f32>(points);
+        let size = monitor.size().to_logical::<f32>(points);
+        let covered = egui::Rect::from_min_size(
+            Pos2::new(origin.x, origin.y),
+            Vec2::new(size.width, size.height),
+        );
+
+        if covered.contains(position) {
+            return true;
+        }
+    }
+
+    !saw_a_monitor
 }
 
 /// The size of the largest display, in egui points, or a figure past any real display when winit
