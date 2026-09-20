@@ -1,7 +1,7 @@
 use crate::{BufferMutRef, ColorFieldOrder, EguiSoftwareRender};
 use egui::{
     Context, CursorGrab, IconData, Pos2, SystemTheme, Vec2, ViewportBuilder, ViewportCommand,
-    WindowLevel, X11WindowType,
+    ViewportId, ViewportInfo, WindowLevel, X11WindowType,
 };
 use softbuffer::SoftBufferError;
 use std::boxed::Box;
@@ -152,6 +152,10 @@ struct RunningEguiAppState<EguiApp: App, EguiAppFactory: FnMut(Context) -> EguiA
     fullscreen: bool,
     visible: bool,
     input_events: Vec<egui::Event>,
+    /// What egui is told about the window each frame: where it is, how big it is, whether it is
+    /// focused, minimised or maximised. Kept here rather than rebuilt per frame because
+    /// `ViewportInfo` carries state the window itself cannot answer for, such as pending events.
+    viewport_info: ViewportInfo,
 }
 
 impl<EguiApp: App, EguiAppFactory: FnMut(Context) -> EguiApp> Default
@@ -226,6 +230,14 @@ impl<EguiApp: App, EguiAppFactory: FnMut(Context) -> EguiApp>
         let fullscreen = self.config.viewport_builder.fullscreen.unwrap_or_default();
         let visible = self.config.viewport_builder.visible.unwrap_or(true);
 
+        let mut viewport_info = ViewportInfo::default();
+        egui_winit::update_viewport_info(
+            &mut viewport_info,
+            &self.egui_context,
+            &self.window,
+            true,
+        );
+
         Ok(RunningEguiAppState {
             config: self.config,
             renderer: self.renderer,
@@ -240,6 +252,7 @@ impl<EguiApp: App, EguiAppFactory: FnMut(Context) -> EguiApp>
             visible,
             input_events: Vec::new(),
             software_backend: self.software_backend,
+            viewport_info,
         })
     }
 }
@@ -470,7 +483,22 @@ impl<EguiApp: App, EguiAppFactory: FnMut(Context) -> EguiApp>
                     SoftwareBackendAppError::soft_buffer("softbuffer::Surface::resize"),
                 )?;
 
+                // egui only knows where the window is, how big it is, and whether it is focused,
+                // minimised or maximised if it is told each frame. Without this
+                // `ctx.input(|i| i.viewport())` has no `inner_rect` and no `outer_rect`, so an
+                // application cannot read its own window geometry — to save and restore it across
+                // runs, for example. eframe does exactly this, in the same order.
+                egui_winit::update_viewport_info(
+                    &mut self.viewport_info,
+                    &self.egui_context,
+                    self.window.deref(),
+                    false,
+                );
+
                 let mut raw_input = self.egui_winit.take_egui_input(self.window.deref());
+                raw_input
+                    .viewports
+                    .insert(ViewportId::ROOT, self.viewport_info.clone());
 
                 raw_input
                     .events
