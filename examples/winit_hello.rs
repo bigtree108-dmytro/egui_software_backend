@@ -14,7 +14,7 @@ impl egui_software_backend::App for EguiApp {
     fn ui(&mut self, ui: &mut egui::Ui, backend: &mut SoftwareBackend) {
         backend.set_capture_frame_time(true);
 
-        egui::CentralPanel::default().show_inside(ui, |ui| {
+        egui::CentralPanel::default().show(ui, |ui| {
             let last_frame_time = backend.last_frame_time().unwrap_or_default();
 
             ui.label("Hello World!");

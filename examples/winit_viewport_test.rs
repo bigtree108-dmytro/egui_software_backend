@@ -21,7 +21,7 @@ impl EguiApp {
     }
 
     fn update(&mut self, ui: &mut egui::Ui) {
-        egui::CentralPanel::default().show_inside(ui, |ui| {
+        egui::CentralPanel::default().show(ui, |ui| {
             egui::scroll_area::ScrollArea::both().show(ui, |ui| {
                 let ctx = ui.ctx().clone();
 

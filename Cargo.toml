@@ -10,7 +10,7 @@ license = "MIT OR Apache-2.0"
 keywords = ["egui", "raster", "software", "render", "softbuffer"]
 
 [dependencies]
-egui = { version = "0.34", default-features = false }
+egui = { version = "0.36", default-features = false }
 strength_reduce = "0.2.4"
 constify = { path = "constify", version = "0.0.1" }
 ahash = { version = "0.8", default-features = false, features = ["no-rng"] }
@@ -22,21 +22,21 @@ log = { version = "0.4", optional = true }
 # this crate's own features.
 winit = { version = "0.30", optional = true, default-features = false, features = ["rwh_06"] }
 softbuffer = { version = "0.4", optional = true }
-egui-winit = { version = "0.34", default-features = false, optional = true }
+egui-winit = { version = "0.36", default-features = false, optional = true }
 bytemuck = { version = "1.25", optional = true }
 
 # Optional dependencies for automated testing:
-egui_kittest = { version = "0.34", optional = true }
+egui_kittest = { version = "0.36", optional = true }
 image = { version = "0.25", optional = true }
 
 [dev-dependencies]
-egui = { version = "0.34", features = ["default_fonts"] }
-eframe = "0.34"
-egui_kittest = { version = "0.34", features = ["snapshot", "wgpu"] }
-egui_demo_lib = { version = "0.34" }
-egui_extras = { version = "0.34", features = ["all_loaders"] }
-egui-winit = { version = "0.34", default-features = false }
-epaint_default_fonts = "0.34"
+egui = { version = "0.36", features = ["default_fonts"] }
+eframe = "0.36"
+egui_kittest = { version = "0.36", features = ["snapshot", "wgpu"] }
+egui_demo_lib = { version = "0.36" }
+egui_extras = { version = "0.36", features = ["all_loaders"] }
+egui-winit = { version = "0.36", default-features = false }
+epaint_default_fonts = "0.36"
 
 softbuffer = { version = "0.4" }
 image = { version = "0.25", features = ["jpeg", "png"] }

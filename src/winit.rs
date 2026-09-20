@@ -836,6 +836,23 @@ impl<EguiApp: App, EguiAppFactory: FnMut(Context) -> EguiApp>
                                 ViewportCommand::StartDrag => {
                                     //UNSUPPORTED
                                 }
+                                // Borderless fullscreen on the monitor at that index in winit's
+                                // own `available_monitors()` order, which is the order egui counts
+                                // in. An index past the end is ignored, as egui documents.
+                                ViewportCommand::SetMonitor(index) => {
+                                    if let Some(monitor) =
+                                        self.window.available_monitors().nth(*index)
+                                    {
+                                        self.window.set_fullscreen(Some(Fullscreen::Borderless(
+                                            Some(monitor),
+                                        )));
+                                    } else {
+                                        #[cfg(feature = "log")]
+                                        log::warn!(
+                                            "ViewportCommand::SetMonitor({index}) names a monitor that does not exist."
+                                        );
+                                    }
+                                }
                             }
 
                             if die {
@@ -919,7 +936,7 @@ impl<EguiApp: App, EguiAppFactory: FnMut(Context) -> EguiApp>
 ///         backend.set_capture_frame_time(true);
 ///
 ///
-///        egui::CentralPanel::default().show_inside(ui, |ui| {
+///        egui::CentralPanel::default().show(ui, |ui| {
 ///        ui.label(format!(
 ///           "Frame Time {}ms",
 ///            backend.last_frame_time().unwrap_or_default().as_millis()
@@ -996,6 +1013,7 @@ impl SoftwareBackendAppConfiguration {
         //The constructor is not const.
         let vp = ViewportBuilder {
             override_redirect: None,
+            monitor: None,
             title: None,
             app_id: None,
             position: None,
