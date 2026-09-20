@@ -1003,6 +1003,9 @@ fn update_canvas_tile(
     }
 }
 
+/// Below this, giving the memory back is not worth the reallocation that does it.
+const MIN_SHRINK_PIXELS: usize = 64 * 1024;
+
 #[derive(Default)]
 struct Canvas {
     data: Vec<[u8; 4]>,
@@ -1020,7 +1023,21 @@ impl Canvas {
     /// returns true if wasn't already the given size
     fn resize(&mut self, width: usize, height: usize) -> bool {
         if width != self.width || height != self.height {
-            self.data.resize(width * height, [0; 4]);
+            let pixels = width * height;
+            self.data.resize(pixels, [0; 4]);
+
+            // `Vec::resize` drops the length and keeps the allocation, so without this a window
+            // that has once been maximised holds a full-screen canvas for the rest of its life:
+            // restoring 1920x1111 to 1400x763 leaves ~4 MB behind, and a 4K monitor four times
+            // that. Not on every resize, though — dragging a window edge resizes by a few pixels
+            // per frame, and reallocating megabytes each frame would be worse than the waste. Both
+            // guards are needed: the fraction keeps a drag from ever reallocating, and the floor
+            // keeps a small window from doing it for a few kilobytes.
+            let waste = self.data.capacity() - pixels;
+            if waste > pixels / 4 && waste > MIN_SHRINK_PIXELS {
+                self.data.shrink_to_fit();
+            }
+
             self.width = width;
             self.height = height;
             self.width_extent = width - 1;
@@ -1191,5 +1208,54 @@ impl<'a> BufferRef<'a> {
     #[inline(always)]
     pub fn get_ref(&self, x: usize, y: usize) -> &[u8; 4] {
         &self.data[x + y * self.width]
+    }
+}
+
+#[cfg(test)]
+mod canvas_tests {
+    use super::{Canvas, MIN_SHRINK_PIXELS};
+
+    #[test]
+    fn a_canvas_that_grew_and_shrank_gives_the_memory_back() {
+        let mut canvas = Canvas::default();
+        canvas.resize(1920, 1111);
+        let maximised = canvas.data.capacity();
+
+        canvas.resize(1400, 763);
+
+        // The contract is the waste bound the resize rule promises, not an exact capacity, which
+        // belongs to the allocator rather than to this crate.
+        let restored = 1400 * 763;
+        assert!(
+            canvas.data.capacity() <= restored + restored / 4,
+            "restoring a maximised window kept {} pixels allocated for {restored}, out of {maximised}",
+            canvas.data.capacity()
+        );
+    }
+
+    // Dragging a window edge resizes it many times a second by a few pixels. Reallocating the whole
+    // canvas on each of those would cost more than the memory it returns.
+    #[test]
+    fn a_canvas_nudged_smaller_does_not_reallocate() {
+        let mut canvas = Canvas::default();
+        canvas.resize(1920, 1111);
+        let before = canvas.data.capacity();
+
+        for width in (1900..1920).rev() {
+            canvas.resize(width, 1111);
+        }
+
+        assert_eq!(canvas.data.capacity(), before);
+    }
+
+    #[test]
+    fn a_small_canvas_does_not_reallocate_for_a_handful_of_pixels() {
+        let mut canvas = Canvas::default();
+        canvas.resize(MIN_SHRINK_PIXELS, 1);
+        let before = canvas.data.capacity();
+
+        canvas.resize(MIN_SHRINK_PIXELS / 2, 1);
+
+        assert_eq!(canvas.data.capacity(), before);
     }
 }
