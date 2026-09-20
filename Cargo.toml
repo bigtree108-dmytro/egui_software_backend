@@ -68,6 +68,9 @@ rayon = ["dep:rayon"]
 raster_stats = ["std"]
 test_render = ["dep:image", "dep:egui_kittest"]
 winit = ["dep:winit", "softbuffer", "egui-winit", "bytemuck"]
+## Expose the window to screen readers through [AccessKit](https://accesskit.dev). egui builds the
+## accessibility tree either way; this is what carries it to the platform.
+accesskit = ["winit", "egui-winit?/accesskit"]
 
 # Testing:
 # cargo test --features test_render
